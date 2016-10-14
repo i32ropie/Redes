@@ -1,0 +1,12 @@
+Servidor:
+    - Creamos un socket por el cual vemos las entradas
+    - Cuando un Cliente use 'connect', en el servidor hacemos 'accept' para crear la conexión y se crea un socket nuevo para esa conexión.
+    - Podemos usar 'send'-'recv' o 'write'-'read' para enviar-recibir mensajes.
+    - Estructura:
+        - socket(), bind(), listen(), accept(), recv(), close()
+
+Cliente:
+    -Estructura:
+        - socket(), connect(), send(), recv(), close()
+
+Función select:
