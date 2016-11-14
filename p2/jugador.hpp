@@ -84,12 +84,15 @@ namespace r{
         inline uint get_wins() const { return _wins; }
         inline uint get_loses() const {return _loses; }
         friend std::ostream &operator <<(std::ostream &output, const Player &p){
-            output << "\tUsername: " << p.get_username() << std::endl;
-            output << "\tPassword: " << p.get_password() << std::endl;
-            output << "\tScore: " << p.get_score() << std::endl;
+            output << "Stats:" << std::endl;
+            output << "\tTotal score: " << p.get_score() << std::endl;
             output << "\tWins: " << p.get_wins() << std::endl;
             output << "\tLoses: " << p.get_loses() << std::endl;
             return output;
+        }
+        std::string get_stats() const {
+            std::string res = "Stats:\n\tTotal score: " + std::to_string(this->get_score()) + "\n\tWins: " + std::to_string(this->get_wins()) + "\n\tLoses: " + std::to_string(this->get_loses()) + "\n\n";
+            return res;
         }
     };
 }

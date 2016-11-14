@@ -320,12 +320,13 @@ int main(){
                                             if(partidas[mapa_aux[i]-1].solve(sol)){
                                                 send(i, "+Ok. Enhorabuena.\n", strlen("+Ok. Enhorabuena.\n"), 0);
                                                 usleep(300);
-                                                send(i, "Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n", strlen("Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n"), 0);
+
                                                 if(partidas[mapa_aux[i]-1].get_gm() == SINGLEPLAYER){
                                                     partidas[mapa_aux[i]-1].add_points();
                                                     for(auto it = p_buffer.begin() ; it != p_buffer.end() ; ++it){
                                                         if(it->get_socket() == i){
                                                             *it = partidas[mapa_aux[i]-1].curr_player();
+                                                            send(i, (it->get_stats()).c_str(), it->get_stats().size(), 0);
                                                         }
                                                     }
                                                 }
@@ -353,6 +354,7 @@ int main(){
                                                         }
                                                     }
                                                 }
+                                                send(i, "Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n", strlen("Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n"), 0);
                                                 partidas.erase(partidas.begin() + mapa_aux[i]);
                                                 mapa_aux.erase(i);
                                             }
