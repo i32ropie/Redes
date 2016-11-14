@@ -259,7 +259,7 @@ int main(){
                                             else{
                                                 send(i, "+Ok. No existe la consonante.\n", strlen("+Ok. No existe la consonante.\n"), 0);
                                                 partidas[mapa_aux[i]-1].next_turn();
-                                                if(partidas[mapa_aux[i]-1].get_gm() == MULTIPLAYER)
+                                                if(partidas[mapa_aux[i]-1].get_gm() == MULTIPLAYER and partidas[mapa_aux[i]-1].get_total() > 1)
                                                     send(partidas[mapa_aux[i]-1].curr_player().get_socket(), "+Ok. Es su turno, puede comenzar\n", strlen("+Ok. Es su turno, puede comenzar\n"), 0);
                                             }
 
@@ -342,6 +342,7 @@ int main(){
                                                                 it->add_score(partidas[mapa_aux[i]-1].get_points());
                                                                 it->commit();
                                                             }
+                                                            send(it->get_socket(), (it->get_stats()).c_str(), it->get_stats().size(), 0);
                                                         }
                                                     }
                                                     std::map<int,int> mapa_tmp = mapa_aux;
@@ -387,14 +388,9 @@ int main(){
                                     FD_CLR(i,&read_fds);
                                     std::map<int,int> mapa_tmp = mapa_aux;
                                     if(mapa_aux[i] and partidas[mapa_aux[i]-1].get_gm() == MULTIPLAYER){
-                                        for(auto it = mapa_tmp.begin() ; it != mapa_tmp.end() ; ++it){
-                                            if(it->second == mapa_aux[i] && it->first != i){
-                                                send(it->first , "Partida acabada, alguien se desconectó.\n", strlen("Partida acabada, alguien se desconectó.\n"), 0);
-                                                usleep(300);
-                                                send(it->first , "Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n", strlen("Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n"), 0);
-                                                mapa_aux.erase(it->first);
-                                            }
-                                        }
+                                        partidas[mapa_aux[i]-1].del_player();
+                                        partidas[mapa_aux[i]-1].next_turn();
+                                        send(partidas[mapa_aux[i]-1].curr_player().get_socket(), "+Ok. Es su turno, puede comenzar\n", strlen("+Ok. Es su turno, puede comenzar\n"), 0);
                                     }
                                     int pos;
                                     for(int j = 0 ; j < p_buffer.size() ; ++j){

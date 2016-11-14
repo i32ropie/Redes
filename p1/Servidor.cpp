@@ -9,6 +9,7 @@
 #include <ctime>
 #include <map>
 #include <unistd.h> // close()
+#include <cstdlib>
 
 int main(int argc, char const *argv[]) {
     int socketServidor;

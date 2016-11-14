@@ -30,6 +30,11 @@ namespace r{
         std::string _actual_state;
         std::vector<int> _points;
     public:
+        /**
+         * La idea del parámetro troll_mode es que se puedan resolver algunos refranes con la
+         * típica muletilla "patada en los cojones". Con esto se pretende hacer el juego más
+         * ameno y entretenido, en ningún caso ofender a nadie.
+         */
         Game(const type &game_mode, const bool &troll_mode = true): _game_mode(game_mode), _turn(0), _moves(0), _ended(false), _ready(false){
             if(game_mode == SINGLEPLAYER){
                 _total = 1;
@@ -53,6 +58,7 @@ namespace r{
         inline std::string get_aux() const { return _aux; }
         inline type get_gm() const { return _game_mode; }
         inline int get_turn() const { return _turn; }
+        inline int get_total() const { return _total; }
         inline int get_moves() const { return _moves; }
         inline bool is_ended() const { return _ended; }
         inline bool is_turn(const int &socket) { return _players[_turn].get_socket() == socket; }
@@ -60,6 +66,12 @@ namespace r{
         inline void end_game() { _ended = true; }
         inline int get_points() const { return _game_mode == SINGLEPLAYER? _players[0].get_score() : _points[_turn]; }
         inline Player curr_player() { return _players[_turn]; }
+        void del_player(){
+            if(_game_mode == MULTIPLAYER){
+                _players.erase(_players.begin() + _turn);
+                _total--;
+            }
+        }
         /**
          * When to call this function?
          * Every time inside multiplayers gome and at the end of singleplayer games cuz in sp it will end the game
@@ -67,7 +79,7 @@ namespace r{
         void add_points(){
             assert(this->is_ready() && !this->is_ended());
             if(_game_mode == MULTIPLAYER){
-                _points[this->get_turn()] += 50;
+                _points[_turn] += 50;
             }
             else{
                 switch (_moves){
@@ -100,7 +112,7 @@ namespace r{
         void next_turn(){
             assert(this->is_ready() && !this->is_ended());
             if(_game_mode == MULTIPLAYER)
-                this->set_turn((this->get_turn()+1)%3);
+                this->set_turn((this->get_turn()+1)%_total);
         }
         /**
          * Function that checks if the letter is in the solution and
@@ -114,7 +126,7 @@ namespace r{
             std::size_t pos;
             type gm = this->get_gm();
             _moves++;
-            if(_game_mode == MULTIPLAYER)
+            if(_game_mode == MULTIPLAYER && is_vowel(l))
                 _points[this->get_turn()] -= 50;
             do{
                 pos = _aux.find(l);
