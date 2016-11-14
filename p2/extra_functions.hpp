@@ -9,18 +9,24 @@
 //#include "jugador.hpp"
 
 
-bool sql_exists(const std::string &st){
+bool sql_exists(const std::string &st, const std::string &ps = ""){
     sqlite3 *db;
     int rc = sqlite3_open("players.db", &db);
     // TODO: Control de errores.
-    std::string order = "select * from players where username = ?";
+    std::string order;
+    if(ps.empty())
+        order = "select * from players where username = ?";
+    else
+        order = "select * from players where username = ? and password = ?";
     sqlite3_stmt *stmt;
     rc = sqlite3_prepare_v2(db, order.c_str(), -1 , &stmt, NULL);
     if (rc != SQLITE_OK)
         throw std::string(sqlite3_errmsg(db));
-    sqlite3_bind_text(stmt, 1, st.c_str(), -1, 0);
+    // sqlite3_bind_text(stmt, 1, st.c_str(), -1, 0);
     // http://stackoverflow.com/a/14438228
     sqlite3_bind_text(stmt, 1, st.c_str(), -1, 0);
+    if(!ps.empty())
+        sqlite3_bind_text(stmt, 2, ps.c_str(), -1, 0);
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
     sqlite3_close(db);

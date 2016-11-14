@@ -47,19 +47,24 @@ int main(){
         if(FD_ISSET(socket_cliente, &aux_fds)){
             recv(socket_cliente, buffer, sizeof(buffer), 0);
             tmp_buffer = std::string(buffer);
-            std::cout << "SERVIDOR: " << tmp_buffer << std::endl;
+            if(tmp_buffer.empty() || tmp_buffer == "Desconexión del servidor"){
+                close(socket_cliente);
+                std::cout << "Servidor cerrado." << std::endl;
+                exit(1);
+            }
+            std::cout << tmp_buffer << std::endl;
         }
         else{
-            std::cout << "> ";
+//            std::cout << "> ";
             fflush(stdout);
             if(FD_ISSET(0, &aux_fds)){
                 std::getline(std::cin, tmp_buffer);
                 // comprobar si quiere salir
+                send(socket_cliente, tmp_buffer.c_str(), tmp_buffer.size(), 0);
                 if(tmp_buffer == "SALIR"){
                     close(socket_cliente);
                     exit(EXIT_SUCCESS);
                 }
-                send(socket_cliente, tmp_buffer.c_str(), tmp_buffer.size(), 0);
             }
         }
     }while(true);

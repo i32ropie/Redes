@@ -30,7 +30,7 @@ namespace r{
         std::string _actual_state;
         std::vector<int> _points;
     public:
-        Game(const type &game_mode, const bool &troll_mode = false): _game_mode(game_mode), _turn(0), _moves(0), _ended(false), _ready(false){
+        Game(const type &game_mode, const bool &troll_mode = true): _game_mode(game_mode), _turn(0), _moves(0), _ended(false), _ready(false){
             if(game_mode == SINGLEPLAYER){
                 _total = 1;
 //                _players = std::vector<Player>(1);
@@ -45,6 +45,7 @@ namespace r{
             _troll = troll_mode? aux[1] : aux[0];
             _actual_state = convert_solution(_solution);
         }
+        inline std::vector<Player> get_players() const { return _players; }
         inline void set_turn(const int &turn) { _turn = turn; }
         inline std::string get_solution() const { return _solution; }
         inline std::string get_solution_troll() const { return _troll; }
@@ -55,7 +56,10 @@ namespace r{
         inline int get_moves() const { return _moves; }
         inline bool is_ended() const { return _ended; }
         inline bool is_turn(const int &socket) { return _players[_turn].get_socket() == socket; }
+        inline bool can_afford() { return _game_mode == MULTIPLAYER ? _points[_turn] >= 50 : true; }
         inline void end_game() { _ended = true; }
+        inline int get_points() const { return _game_mode == SINGLEPLAYER? _players[0].get_score() : _points[_turn]; }
+        inline Player curr_player() const { return _players[_turn]; }
         /**
          * When to call this function?
          * Every time inside multiplayers gome and at the end of singleplayer games cuz in sp it will end the game
@@ -90,7 +94,7 @@ namespace r{
                 this->end_game();
             }
         }
-        /*
+        /**
          * Function that updates the turn.
          */
         void next_turn(){
@@ -98,7 +102,7 @@ namespace r{
             if(_game_mode == MULTIPLAYER)
                 this->set_turn((this->get_turn()+1)%3);
         }
-        /*
+        /**
          * Function that checks if the letter is in the solution and
          * administrates the points.
          */
@@ -110,6 +114,8 @@ namespace r{
             std::size_t pos;
             type gm = this->get_gm();
             _moves++;
+            if(_game_mode == MULTIPLAYER)
+                _points[this->get_turn()] -= 50;
             do{
                 pos = _aux.find(l);
                 if(pos!=std::string::npos){

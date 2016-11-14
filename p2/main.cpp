@@ -6,7 +6,8 @@
 int main(int argc, char const *argv[]) {
     srand(time(NULL));
     bool salir = false;
-    char c;
+//    char c;
+    std::string c;
     int opt;
     std::string res;
     r::Game game(SINGLEPLAYER, true);
@@ -26,7 +27,7 @@ int main(int argc, char const *argv[]) {
             std::getline(std::cin, res);
         }
         if(opt == 1){
-            game.check_letter(c);
+            game.check_letter(c[0]);
         }
         else{
             if(game.solve(res)){
@@ -40,24 +41,16 @@ int main(int argc, char const *argv[]) {
 
 
 
-
+//
 //int main(){
 //    r::Player p;
-//    std::string username;
+//    p.set_score(3);
+//    std::string username, passwd;
 //    std::cout << "Introduce el username: ";
 //    std::cin >> username;
-//    p.load_user(username);
-//    std::cout << std::endl << p << std::endl;
-//    p.add_win();
-//    p.add_score(150);
-//    p.commit();
-//    std::cout << std::endl << p << std::endl;
-//    p.add_win();
-//    p.add_score(150);
-//    p.commit();
-//    std::cout << std::endl << p << std::endl;
-//    p.add_win();
-//    p.add_score(150);
-//    p.commit();
-//    std::cout << std::endl << p << std::endl;
+//    std::cout << "Introduce la contraseña: ";
+//    std::cin >> passwd;
+//    p.create_user(username, passwd);
+//    std::cout << p << std::endl;
+//    return 0;
 //}

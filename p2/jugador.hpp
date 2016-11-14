@@ -24,6 +24,7 @@ namespace r{
         Player(const std::string &username, const std::string &password){
             this->create_user(username, password);
         }
+        inline void set_socket(const int &socket) { _socket = socket; }
         inline int get_socket() const { return _socket; }
 //        Game * get_partida() const { return _partida; }
 //        void set_partida(Game *partida) { _partida = partida; }
@@ -66,7 +67,7 @@ namespace r{
             this->set_loses(0);
         }
         // TODO: Actualizar las funciones para que usen la base de datos.
-//        inline void set_username(const std::string &username) { _username = username; }
+        inline void set_username(const std::string &username) { _username = username; }
         inline void set_password(const std::string &password) { _password = password; }
         inline void set_score(const uint &score) { _score = score; }
         inline void set_wins(const uint &wins) { _wins = wins; }
@@ -82,12 +83,13 @@ namespace r{
         inline uint get_score() const { return _score; }
         inline uint get_wins() const { return _wins; }
         inline uint get_loses() const {return _loses; }
-        void set_username(const std::string &username) {
-            sql_stmt("update players set username = \"" + username + "\" where username = \"" +  _username + "\"");
-            _username = username;
+        Player &operator =(const Player &p) {
+            this->load_user(p.get_username());
+            return *this;
         }
-//        void set_score(const uint &score){
-//            sql_stmt("update players set score = \"");
+//        void set_username(const std::string &username) {
+//            sql_stmt("update players set username = \"" + username + "\" where username = \"" +  _username + "\"");
+//            _username = username;
 //        }
         friend std::ostream &operator <<(std::ostream &output, const Player &p){
             output << "\tUsername: " << p.get_username() << std::endl;

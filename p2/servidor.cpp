@@ -5,85 +5,395 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <string>
+#include <regex>
+#include <algorithm>
 #include <cstring>
 #include <ctime>
+#include <vector>
 #include <map>
 #include <unistd.h> // close()
+#include "servidor.hpp"
 #include "jugador.hpp"
 #include "partida.hpp"
+#include "extra_functions.hpp"
+
 
 int main(){
-    int socket, nuevo_socket;
+    srand(time(NULL));
+    int sock, nuevo_socket;
     int salida;
     sockaddr_in servidor, cliente;
+    bool encontrado = false;
     char buffer[250];
+    std::regex e;
+    std::vector<r::Game> partidas;
+    std::vector<r::Player> p_buffer;
+    std::map<int, int> mapa_aux;
+    std::string buffer_string;
     fd_set read_fds, aux_fds;
     int on, ret;
 
-    socket = socket(AF_INET, SOCK_STREAM, 0);
-    if(socket == -1){
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    if(sock == -1){
         std::cerr << "No se puede abrir el socket cliente" << std::endl;
         exit(-1);
     }
 
     on = 1;
-    ret = setsockopt( socket, SOL_SOCKET, SO_REUSEADOR, &on, sizeof(on));
+    ret = setsockopt( sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
 
     servidor.sin_family = AF_INET;
-    servidor.sin_port = htons(2000);
+    servidor.sin_port = htons(2050);
     servidor.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    if( bind(socket, (sockaddr *) &servidor, sizeof(servidor)) == -1 ){
+    if( bind(sock, (sockaddr *) &servidor, sizeof(servidor)) == -1 ){
         std::cerr << "No se pudo hacer bind" << std::endl;
-        close(socket);
+        close(sock);
         exit(-1);
     }
 
     socklen_t cliente_len = sizeof(cliente);
 
-    if(listen(socket, 1) == -1){
+    if(listen(sock, 1) == -1){
         std::cerr << "No se pudo hacer listen" << std::endl;
-        close(socket);
+        close(sock);
         exit(-1);
     }
 
     FD_ZERO(&read_fds);
     FD_ZERO(&aux_fds);
-    FD_SET(socket, &read_fds);
+    FD_SET(sock, &read_fds);
     FD_SET(0, &read_fds);
 
     // signal(SIGINT, manejador);
-    bool salir = true;
+    bool salir = false;
     while(true){
         if(salir){
-            for(int i = 0 ; i < 100 /*partidas.size()*/ ; ++i){
-                // jugadores = partidas[i].get_jugadores();
-                // for(int j = 0 ; j < jugadores.size() ; ++j){
-                //     send(jugadores[i].get_socket(), "Desconexión del servidor\n", strlen("Desconexión del servidor\n"). 0);
-                //     close(jugadores[i].get_socket());
-                //     FD_CLR(jugadores[i].get_socket(), &read_fds);
-                // }
-                close(socket);
-                exit(EXIT_SUCCESS);
+            for(auto it = p_buffer.begin() ; it != p_buffer.end() ; ++it){
+                send(it->get_socket(), "Desconexión del servidor", strlen("Desconexión del servidor"), 0);
+                close(it->get_socket());
+                FD_CLR(it->get_socket(), &read_fds);
+
             }
+            close(sock);
+            exit(EXIT_SUCCESS);
         }
         aux_fds = read_fds;
         salida = select(FD_SETSIZE, &aux_fds, NULL, NULL, NULL);
         if(salida > 0){
             for(int i = 0 ; i < FD_SETSIZE ; ++i){
                 if(FD_ISSET(i, &aux_fds)){
-                    if(i == socket){
-                        if((nuevo_socket = accept(socket, (sockaddr *) &cliente, &cliente_len)) == -1 ){
+                    if(i == sock){
+                        if((nuevo_socket = accept(sock, (sockaddr *) &cliente, &cliente_len)) == -1 ){
                             std::cerr << "Error aceptando peticiones" << std::endl;
                         }
                         else{
-                            if(/*partidas.size() < MAX_CLIENTES*/){
-                                // Game tmp
+                            if(p_buffer.size() < MAX_CLIENTES){
+                                r::Player p;
+                                p.set_socket(nuevo_socket);
+                                p_buffer.push_back(p);
+                                FD_SET(nuevo_socket, &read_fds);
+                                send(nuevo_socket, "+Ok. Usuario conectado.\n", strlen("+Ok. Usuario conectado.\n"), 0);
                             }
+                            else{
+                                send(nuevo_socket, "-Err. Demasiados clientes conectados.\n", strlen("-Err. Demasiados clientes conectados.\n"), 0);
+                                close(nuevo_socket);
+                            }
+                        }
+                    }
+                    else if(i == 0){ // Leemos de teclado.
+                        std::getline(std::cin, buffer_string);
+                        if( buffer_string == "SALIR" ){
+                            salir = true;
+                        }
+                    }
+                    else{
+                        bzero(buffer, sizeof(buffer));
+                        if( recv(i, buffer, sizeof(buffer), 0) > 0 ){
+                            std::string s(buffer);
+                            int peticion = manejar_peticion(s);
+                            if(s.empty()) peticion = 9;
+                            switch(peticion){
+                                case 1:{
+                                     e = "^USUARIO ([[:alnum:]]+)$";
+                                    std::string nombre = std::regex_replace (s,e,"$1",std::regex_constants::format_no_copy);
+                                    if(check1(i, p_buffer)){
+                                        send(i, "-Err. Usted ya está logueado.\n", strlen("-Err. Usted ya está logueado.\n"), 0);
+                                    }
+                                    else{
+                                        if(sql_exists(nombre)){
+                                            send(i, "+Ok. Usuario correcto.\n", strlen("+Ok. Usuario correcto.\n"), 0);
+                                            for(auto it = p_buffer.begin() ; it != p_buffer.end() ; ++it){
+                                                if(it->get_socket() == i)
+                                                    it->set_username(nombre);
+                                            }
+                                        }
+                                        else{
+                                            send(i, "-Err. Usuario incorrecto.\n", strlen("-Err. Usuario incorrecto.\n"), 0);
+                                        }
+                                    }
+                                    break;}
+                                case 2:{
+                                    e = "^PASSWORD ([[:alnum:]]+)$";
+                                    std::string passw = std::regex_replace (s,e,"$1",std::regex_constants::format_no_copy);
+                                    if(check2(i, p_buffer)){
+                                        send(i, "-Err. Usted ya está logueado.\n", strlen("-Err. Usted ya está logueado.\n"), 0);
+                                    }
+                                    else if(not check1(i, p_buffer)){
+                                        send(i, "-Err. Debe de haber validado su usuario antes de introducir la contraseña.\n", strlen("-Err. Debe de haber validado su usuario antes de introducir la contraseña.\n"), 0);
+                                    }
+                                    else{
+                                        for(auto it = p_buffer.begin() ; it != p_buffer.end() ; ++it){
+                                            if(it->get_socket() == i){
+                                                if(it->get_password().empty() && sql_exists(it->get_username(), passw)){
+                                                    it->load_user(it->get_username());
+                                                    encontrado = true;
+                                                    send(i,"+Ok. Contraseña Correcta. Ya puede iniciar partida.\n",strlen("+Ok. Contraseña Correcta. Ya puede iniciar partida.\n"),0);
+                                                }
+                                            }
+                                        }
+                                        if(!encontrado)
+                                            send(i, "-Err. Contraseña incorrecta.\n", strlen("-Err. Contraseña incorrecta.\n"), 0);
+                                    }
+                                    break;}
+                                case 3:{
+                                    e = "^REGISTRO -u ([[:alnum:]]+) -p ([[:alnum:]]+)$";
+                                    std::string nombre = std::regex_replace (s,e,"$1",std::regex_constants::format_no_copy);
+                                    std::string passw = std::regex_replace (s,e,"$2",std::regex_constants::format_no_copy);
+                                    if(check2(i, p_buffer)){
+                                        send(i, "-Err. Usted ya está logueado.\n", strlen("-Err. Usted ya está logueado.\n"), 0);
+                                    }
+                                    else if(sql_exists(nombre)){
+                                        send(i, "-Err. El usuario ya existe. Utilice otro nombre.\n", strlen("-Err. El usuario ya existe. Utilice otro nombre.\n"), 0);
+                                    }
+                                    else{
+                                        for(auto it = p_buffer.begin() ; it != p_buffer.end() ; ++it){
+                                            if(it->get_socket() == i){
+                                                it->create_user(nombre, passw);
+                                                send(i,"+Ok. Usuario registrado correctamente.\n",strlen("+Ok. Usuario registrado correctamente.\n"),0);
+                                            }
+                                        }
+                                    }
+                                    break;}
+                                case 4:{
+                                    if(check2(i, p_buffer) && not mapa_aux[i]){
+                                        r::Game tmp_g(SINGLEPLAYER);
+                                        for(auto it = p_buffer.begin() ; it != p_buffer.end() ; ++it){
+                                            if(it->get_socket() == i){
+                                                tmp_g.add_player(*it);
+                                                partidas.push_back(tmp_g);
+                                                mapa_aux[i] = partidas.size();
+                                                send(i, (tmp_g.get_actual_state()+"\n").c_str(), (tmp_g.get_actual_state()+"\nS").size(), 0);
+                                            }
+                                        }
+                                    }
+                                    else{
+                                        send(i , "-Err. Asegúrate que estás logueado y no estás en partida.\n", strlen("-Err. Asegúrate que estás logueado y no estás en partida.\n"), 0);
+                                    }
+                                    break;}
+                                case 5:{
+//                                    send(i, "-Err. Opcion en desarrollo.\n", strlen("-Err. Opcion en desarrollo.\n"), 0);
+                                    if(check2(i, p_buffer) && not mapa_aux[i]){
+                                        for(int j = 0 ; j < partidas.size() ; ++j){
+                                            if(!partidas[j].is_ready()){
+                                                for(auto it = p_buffer.begin() ; it != p_buffer.end() ; ++it){
+                                                    if(it->get_socket() == i){
+                                                        partidas[j].add_player(*it);
+                                                        mapa_aux[i] = j+1;
+                                                        std::string msg = "+Ok. Unido a partida multijugador existente. Cuando haya 3 jugadores se le avisará y podrá empezar.\n";
+                                                        send(i, msg.c_str(), msg.size(), 0);
+                                                        break;
+                                                    }
+                                                }
+                                                break;
+                                            }
+                                        }
+                                        if(mapa_aux[i]){
+                                            if(partidas[mapa_aux[i]-1].is_ready()){
+                                                for(auto it = mapa_aux.begin() ; it != mapa_aux.end() ; ++it){
+                                                    if(it->second == mapa_aux[i]){
+                                                        send(it->first, "+Ok. Partida multijugador iniciada. Espere su turno por favor.\n", strlen("+Ok. Partida multijugador iniciada. Espere su turno por favor\n"), 0);
+                                                        usleep(3000);
+                                                        send(it->first, (partidas[mapa_aux[i]-1].get_actual_state() + "\n").c_str(), (partidas[mapa_aux[i]-1].get_actual_state() + "\n").size(), 0);
+//                                                        if(partidas[mapa_aux[i]-1].is_turn(it->second)){
+//                                                            send(it->first, "+Ok. Es su turno, puede comenzar\n", strlen("+Ok. Es su turno, puede comenzar\n"), 0);
+//                                                        }
+                                                    }
+                                                }
+                                                send(partidas[mapa_aux[i]-1].curr_player().get_socket(), "+Ok. Es su turno, puede comenzar\n", strlen("+Ok. Es su turno, puede comenzar\n"), 0);
+                                            }
+                                        }
+                                        else{
+                                            r::Game tmp_g(MULTIPLAYER);
+                                            for(auto it = p_buffer.begin() ; it != p_buffer.end() ; ++it) {
+                                                if (it->get_socket() == i) {
+                                                    tmp_g.add_player(*it);
+                                                    partidas.push_back(tmp_g);
+                                                    mapa_aux[i] = partidas.size();
+                                                    send(i, "+Ok. Partida multijugador creada. Cuando esté lista para ser jugada será avisado.\n", strlen("+Ok. Partida multijugador creada. Cuando esté lista para ser jugada será avisado.\n"), 0);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    else{
+                                        send(i , "-Err. Asegúrate que estás logueado y no estás en partida.\n", strlen("-Err. Asegúrate que estás logueado y no estás en partida.\n"), 0);
+                                    }
+                                    break;}
+                                case 6:{
+                                    if(check2(i, p_buffer) && mapa_aux[i]){
+                                        std::regex e ("^CONSONANTE ([b-df-hj-np-tv-z])$");
+                                        char consonante = std::regex_replace (s,e,"$1",std::regex_constants::format_no_copy)[0];
+                                        if(!partidas[mapa_aux[i]-1].is_turn(i)){
+                                            send(i, "-Err. Debe esperar su turno.\n", strlen("-Err. Debe esperar su turno.\n"), 0);
+                                        }
+                                        else if(partidas[mapa_aux[i]-1].get_actual_state() == partidas[mapa_aux[i]-1].get_solution()){
+                                            send(i, "¡Ya no hay más chicha, resuelve con el comando RESOLVER solción!\n", strlen("¡Ya no hay más chicha, resuelve con el comando RESOLVER solción!\n"), 0);
+                                        }
+                                        else{
+                                            partidas[mapa_aux[i]-1].check_letter(consonante);
+                                            std::string state = partidas[mapa_aux[i]-1].get_actual_state() + "\n";
+                                            for(auto it = p_buffer.begin() ; it != p_buffer.end() ; ++it){
+                                                if(mapa_aux[it->get_socket()] == mapa_aux[i])
+                                                    send(it->get_socket(), state.c_str(), state.size(), 0);
+                                            }
+//                                            send(i, state.c_str(), state.size(), 0);
+                                            partidas[mapa_aux[i]-1].next_turn();
+                                            send(partidas[mapa_aux[i]-1].curr_player().get_socket(), "+Ok. Es su turno, puede comenzar\n", strlen("+Ok. Es su turno, puede comenzar\n"), 0);
+                                        }
+                                    }
+                                    else{
+                                        send(i , "-Err. Asegúrate que estás logueado y estás en partida.\n", strlen("-Err. Asegúrate que estás logueado y estás en partida.\n"), 0);
+                                    }
+                                    break;}
+                                case 7:{
+                                    if(check2(i, p_buffer) && mapa_aux[i]){
+                                        std::regex e ("^VOCAL ([aeiou])$");
+                                        char vocal = std::regex_replace (s,e,"$1",std::regex_constants::format_no_copy)[0];
+                                        if(!partidas[mapa_aux[i]-1].is_turn(i)){
+                                            send(i, "-Err. Debe esperar su turno.\n", strlen("-Err. Debe esperar su turno.\n"), 0);
+                                        }
+                                        else if(partidas[mapa_aux[i]-1].get_actual_state() == partidas[mapa_aux[i]-1].get_solution()){
+                                            send(i, "¡Ya no hay más chicha, resuelve con el comando RESOLVER solción!\n", strlen("¡Ya no hay más chicha, resuelve con el comando RESOLVER solción!\n"), 0);
+                                        }
+                                        else if(!partidas[mapa_aux[i]-1].can_afford()){
+                                            send(i, "-Err. Necesitas al menos 50 puntos para solicitar una vocal.", strlen("-Err. Necesitas al menos 50 puntos para solicitar una vocal."), 0);
+                                        }
+                                        else{
+                                            partidas[mapa_aux[i]-1].check_letter(vocal);
+                                            std::string state = partidas[mapa_aux[i]-1].get_actual_state() + "\n";
+                                            for(auto it = p_buffer.begin() ; it != p_buffer.end() ; ++it){
+                                                if(mapa_aux[it->get_socket()] == mapa_aux[i])
+                                                    send(it->get_socket(), state.c_str(), state.size(), 0);
+                                            }
+//                                            send(i, state.c_str(), state.size(), 0);
+                                            partidas[mapa_aux[i]-1].next_turn();
+                                            send(partidas[mapa_aux[i]-1].curr_player().get_socket(), "+Ok. Es su turno, puede comenzar\n", strlen("+Ok. Es su turno, puede comenzar\n"), 0);
+
+                                        }
+                                    }
+                                    else{
+                                        send(i , "-Err. Asegúrate que estás logueado y estás en partida.\n", strlen("-Err. Asegúrate que estás logueado y estás en partida.\n"), 0);
+                                    }
+                                    break;}
+                                case 8:{
+                                    if(check2(i, p_buffer) && mapa_aux[i]){
+                                        std::regex e ("^RESOLVER (.+)$");
+                                        std::string sol = std::regex_replace (s,e,"$1",std::regex_constants::format_no_copy);
+                                        if(!partidas[mapa_aux[i]-1].is_turn(i)){
+                                            send(i, "-Err. Debe esperar su turno.\n", strlen("-Err. Debe esperar su turno.\n"), 0);
+                                        }
+                                        else{
+                                            if(partidas[mapa_aux[i]-1].solve(sol)){
+                                                send(i, "¡Enhorabuena, has acertado!\n", strlen("¡Enhorabuena, has acertado!\n"), 0);
+                                                usleep(300);
+                                                send(i, "Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n", strlen("Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n"), 0);
+                                                if(partidas[mapa_aux[i]-1].get_gm() == SINGLEPLAYER){
+                                                    partidas[mapa_aux[i]-1].add_points();
+                                                    for(auto it = p_buffer.begin() ; it != p_buffer.end() ; ++it){
+                                                        if(it->get_socket() == i){
+                                                            *it = partidas[mapa_aux[i]-1].curr_player();
+                                                        }
+                                                    }
+                                                }
+                                                else{
+                                                    std::map<int,int> mapa_tmp = mapa_aux;
+                                                    for(auto it = mapa_tmp.begin() ; it != mapa_tmp.end() ; ++it){
+                                                        if(it->second == mapa_aux[i] && it->first != i){
+                                                            send(it->first , "Partida acabada, alguien intentó resolver y acertó.\n", strlen("Partida acabada, alguien intentó resolver y acertó.\n"), 0);
+                                                            usleep(300);
+                                                            send(it->first , "Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n", strlen("Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n"), 0);
+                                                            mapa_aux.erase(it->first);
+                                                        }
+                                                    }
+                                                }
+                                                partidas.erase(partidas.begin() + mapa_aux[i]);
+                                                mapa_aux.erase(i);
+                                            }
+                                            else{
+                                                send(i, "¡Vaya, parece que esa no era la solución!\n", strlen("¡Vaya, parece que esa no era la solución!\n"), 0);
+                                                usleep(300);
+                                                send(i, "Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n", strlen("Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n"), 0);
+                                                if(partidas[mapa_aux[i]-1].get_gm() == MULTIPLAYER){
+                                                    std::map<int,int> mapa_tmp = mapa_aux;
+                                                    for(auto it = mapa_tmp.begin() ; it != mapa_tmp.end() ; ++it){
+                                                        if(it->second == mapa_aux[i] && it->first != i){
+                                                            send(it->first , "Partida acabada, alguien intentó resolver y falló.\n", strlen("Partida acabada, alguien intentó resolver y falló.\n"), 0);
+                                                            usleep(300);
+                                                            send(it->first , "Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n", strlen("Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n"), 0);
+                                                            mapa_aux.erase(it->first);
+                                                        }
+                                                    }
+                                                }
+                                                partidas.erase(partidas.begin() + mapa_aux[i]);
+                                                mapa_aux.erase(i);
+                                            }
+                                        }
+                                    }
+                                    else{
+                                        send(i , "-Err. Asegúrate que estás logueado y estás en partida.\n", strlen("-Err. Asegúrate que estás logueado y estás en partida.\n"), 0);
+                                    }
+                                    break;}
+                                case 9:{
+//                                    send(i, "ADIOS", strlen("ADIOS"), 0);
+                                    close(i);
+                                    FD_CLR(i,&read_fds);
+                                    std::map<int,int> mapa_tmp = mapa_aux;
+                                    for(auto it = mapa_tmp.begin() ; it != mapa_tmp.end() ; ++it){
+                                        if(it->second == mapa_aux[i] && it->first != i){
+                                            send(it->first, "+Ok. Uno de los jugadores salió. Partida cancelada, inicia partida de nuevo.\n", strlen("+Ok. Uno de los jugadores salió. Partida cancelada, inicia partida de nuevo.\n"), 0);
+                                            mapa_aux.erase(it->first);
+                                        }
+                                    }
+                                    int pos = 0;
+                                    for(int i = 0 ; i < p_buffer.size() ; ++i){
+                                        if(p_buffer[i].get_socket() == i)
+                                            pos = i;
+                                    }
+                                    p_buffer.erase(p_buffer.begin()+pos);
+                                    mapa_aux.erase(i);
+                                }
+                                default:
+                                    send(i, "-Err.\n", strlen("-Err.\n"), 0);
+                                    break;
+                            }
+                            fflush(stdout);
+                        }
+                        else{
+                            close(i);
+                            FD_CLR(i,&read_fds);
+                            int pos;
+                            for(int i = 0 ; i < p_buffer.size() ; ++i){
+                                if(p_buffer[i].get_socket() == i)
+                                    pos = i;
+                            }
+                            p_buffer.erase(p_buffer.begin()+pos);
+                            mapa_aux.erase(i);
                         }
                     }
                 }
             }
         }
     }
+    close(sock);
+    return 0;
 }
