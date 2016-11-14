@@ -59,7 +59,7 @@ namespace r{
         inline bool can_afford() { return _game_mode == MULTIPLAYER ? _points[_turn] >= 50 : true; }
         inline void end_game() { _ended = true; }
         inline int get_points() const { return _game_mode == SINGLEPLAYER? _players[0].get_score() : _points[_turn]; }
-        inline Player curr_player() const { return _players[_turn]; }
+        inline Player curr_player() { return _players[_turn]; }
         /**
          * When to call this function?
          * Every time inside multiplayers gome and at the end of singleplayer games cuz in sp it will end the game

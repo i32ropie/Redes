@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <csignal>
 #include <string>
 #include <regex>
 #include <algorithm>
@@ -17,6 +18,13 @@
 #include "partida.hpp"
 #include "extra_functions.hpp"
 
+bool salir = false;
+
+void manejador(int sigsum){
+    std::cout << std::endl << "Saliendo..." << std::endl;
+    salir = true;
+    signal(SIGINT, manejador);
+}
 
 int main(){
     srand(time(NULL));
@@ -65,8 +73,7 @@ int main(){
     FD_SET(sock, &read_fds);
     FD_SET(0, &read_fds);
 
-    // signal(SIGINT, manejador);
-    bool salir = false;
+    signal(SIGINT, manejador);
     while(true){
         if(salir){
             for(auto it = p_buffer.begin() ; it != p_buffer.end() ; ++it){
@@ -148,12 +155,12 @@ int main(){
                                                 if(it->get_password().empty() && sql_exists(it->get_username(), passw)){
                                                     it->load_user(it->get_username());
                                                     encontrado = true;
-                                                    send(i,"+Ok. Contraseña Correcta. Ya puede iniciar partida.\n",strlen("+Ok. Contraseña Correcta. Ya puede iniciar partida.\n"),0);
+                                                    send(i,"+Ok. Usuario validado.\n",strlen("+Ok. Usuario validado.\n"),0);
                                                 }
                                             }
                                         }
                                         if(!encontrado)
-                                            send(i, "-Err. Contraseña incorrecta.\n", strlen("-Err. Contraseña incorrecta.\n"), 0);
+                                            send(i, "-Err. Error en la validación.\n", strlen("-Err. Error en la validación.\n"), 0);
                                     }
                                     break;}
                                 case 3:{
@@ -192,7 +199,6 @@ int main(){
                                     }
                                     break;}
                                 case 5:{
-//                                    send(i, "-Err. Opcion en desarrollo.\n", strlen("-Err. Opcion en desarrollo.\n"), 0);
                                     if(check2(i, p_buffer) && not mapa_aux[i]){
                                         for(int j = 0 ; j < partidas.size() ; ++j){
                                             if(!partidas[j].is_ready()){
@@ -215,9 +221,6 @@ int main(){
                                                         send(it->first, "+Ok. Partida multijugador iniciada. Espere su turno por favor.\n", strlen("+Ok. Partida multijugador iniciada. Espere su turno por favor\n"), 0);
                                                         usleep(3000);
                                                         send(it->first, (partidas[mapa_aux[i]-1].get_actual_state() + "\n").c_str(), (partidas[mapa_aux[i]-1].get_actual_state() + "\n").size(), 0);
-//                                                        if(partidas[mapa_aux[i]-1].is_turn(it->second)){
-//                                                            send(it->first, "+Ok. Es su turno, puede comenzar\n", strlen("+Ok. Es su turno, puede comenzar\n"), 0);
-//                                                        }
                                                     }
                                                 }
                                                 send(partidas[mapa_aux[i]-1].curr_player().get_socket(), "+Ok. Es su turno, puede comenzar\n", strlen("+Ok. Es su turno, puede comenzar\n"), 0);
@@ -247,19 +250,24 @@ int main(){
                                             send(i, "-Err. Debe esperar su turno.\n", strlen("-Err. Debe esperar su turno.\n"), 0);
                                         }
                                         else if(partidas[mapa_aux[i]-1].get_actual_state() == partidas[mapa_aux[i]-1].get_solution()){
-                                            send(i, "¡Ya no hay más chicha, resuelve con el comando RESOLVER solción!\n", strlen("¡Ya no hay más chicha, resuelve con el comando RESOLVER solción!\n"), 0);
+                                            send(i, "¡Ya no hay más chicha, resuelve con el comando RESOLVER solución!\n", strlen("¡Ya no hay más chicha, resuelve con el comando RESOLVER solución!\n"), 0);
                                         }
                                         else{
-                                            partidas[mapa_aux[i]-1].check_letter(consonante);
+                                            if(partidas[mapa_aux[i]-1].check_letter(consonante)){
+                                                send(i, "+Ok. Existe la consonante.\n", strlen("+Ok. Existe la consonante.\n"), 0);
+                                            }
+                                            else{
+                                                send(i, "+Ok. No existe la consonante.\n", strlen("+Ok. No existe la consonante.\n"), 0);
+                                                partidas[mapa_aux[i]-1].next_turn();
+                                                if(partidas[mapa_aux[i]-1].get_gm() == MULTIPLAYER)
+                                                    send(partidas[mapa_aux[i]-1].curr_player().get_socket(), "+Ok. Es su turno, puede comenzar\n", strlen("+Ok. Es su turno, puede comenzar\n"), 0);
+                                            }
+
                                             std::string state = partidas[mapa_aux[i]-1].get_actual_state() + "\n";
                                             for(auto it = p_buffer.begin() ; it != p_buffer.end() ; ++it){
                                                 if(mapa_aux[it->get_socket()] == mapa_aux[i])
                                                     send(it->get_socket(), state.c_str(), state.size(), 0);
                                             }
-//                                            send(i, state.c_str(), state.size(), 0);
-                                            partidas[mapa_aux[i]-1].next_turn();
-                                            if(partidas[mapa_aux[i]-1].get_gm() == MULTIPLAYER)
-                                                send(partidas[mapa_aux[i]-1].curr_player().get_socket(), "+Ok. Es su turno, puede comenzar\n", strlen("+Ok. Es su turno, puede comenzar\n"), 0);
                                         }
                                     }
                                     else{
@@ -280,17 +288,21 @@ int main(){
                                             send(i, "-Err. Necesitas al menos 50 puntos para solicitar una vocal.", strlen("-Err. Necesitas al menos 50 puntos para solicitar una vocal."), 0);
                                         }
                                         else{
-                                            partidas[mapa_aux[i]-1].check_letter(vocal);
+                                            if(partidas[mapa_aux[i]-1].check_letter(vocal)){
+                                                send(i, "+Ok. Existe la vocal.\n", strlen("+Ok. Existe la vocal.\n"), 0);
+                                            }
+                                            else{
+                                                send(i, "+Ok. No existe la vocal.\n", strlen("+Ok. No existe la vocal.\n"), 0);
+                                                partidas[mapa_aux[i]-1].next_turn();
+                                                if(partidas[mapa_aux[i]-1].get_gm() == MULTIPLAYER)
+                                                    send(partidas[mapa_aux[i]-1].curr_player().get_socket(), "+Ok. Es su turno, puede comenzar\n", strlen("+Ok. Es su turno, puede comenzar\n"), 0);
+                                            }
+
                                             std::string state = partidas[mapa_aux[i]-1].get_actual_state() + "\n";
                                             for(auto it = p_buffer.begin() ; it != p_buffer.end() ; ++it){
                                                 if(mapa_aux[it->get_socket()] == mapa_aux[i])
                                                     send(it->get_socket(), state.c_str(), state.size(), 0);
                                             }
-//                                            send(i, state.c_str(), state.size(), 0);
-                                            partidas[mapa_aux[i]-1].next_turn();
-                                            if(partidas[mapa_aux[i]-1].get_gm() == MULTIPLAYER)
-                                                send(partidas[mapa_aux[i]-1].curr_player().get_socket(), "+Ok. Es su turno, puede comenzar\n", strlen("+Ok. Es su turno, puede comenzar\n"), 0);
-
                                         }
                                     }
                                     else{
@@ -306,7 +318,7 @@ int main(){
                                         }
                                         else{
                                             if(partidas[mapa_aux[i]-1].solve(sol)){
-                                                send(i, "¡Enhorabuena, has acertado!\n", strlen("¡Enhorabuena, has acertado!\n"), 0);
+                                                send(i, "+Ok. Enhorabuena.\n", strlen("+Ok. Enhorabuena.\n"), 0);
                                                 usleep(300);
                                                 send(i, "Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n", strlen("Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n"), 0);
                                                 if(partidas[mapa_aux[i]-1].get_gm() == SINGLEPLAYER){
@@ -318,6 +330,19 @@ int main(){
                                                     }
                                                 }
                                                 else{
+                                                    for(auto it = p_buffer.begin() ; it != p_buffer.end() ; ++it){
+                                                        if(mapa_aux[it->get_socket()] == mapa_aux[i] ){
+                                                            if(it->get_socket() != i){
+                                                                it->add_lose();
+                                                                it->commit();
+                                                            }
+                                                            else{
+                                                                it->add_win();
+                                                                it->add_score(partidas[mapa_aux[i]-1].get_points());
+                                                                it->commit();
+                                                            }
+                                                        }
+                                                    }
                                                     std::map<int,int> mapa_tmp = mapa_aux;
                                                     for(auto it = mapa_tmp.begin() ; it != mapa_tmp.end() ; ++it){
                                                         if(it->second == mapa_aux[i] && it->first != i){
@@ -332,7 +357,7 @@ int main(){
                                                 mapa_aux.erase(i);
                                             }
                                             else{
-                                                send(i, "¡Vaya, parece que esa no era la solución!\n", strlen("¡Vaya, parece que esa no era la solución!\n"), 0);
+                                                send(i, "+Ok. Le deseamos mejor suerte la próxima vez.\n", strlen("+Ok. Le deseamos mejor suerte la próxima vez.\n"), 0);
                                                 usleep(300);
                                                 send(i, "Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n", strlen("Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n"), 0);
                                                 if(partidas[mapa_aux[i]-1].get_gm() == MULTIPLAYER){
@@ -356,20 +381,23 @@ int main(){
                                     }
                                     break;}
                                 case 9:{
-//                                    send(i, "ADIOS", strlen("ADIOS"), 0);
                                     close(i);
                                     FD_CLR(i,&read_fds);
                                     std::map<int,int> mapa_tmp = mapa_aux;
-                                    for(auto it = mapa_tmp.begin() ; it != mapa_tmp.end() ; ++it){
-                                        if(it->second == mapa_aux[i] && it->first != i){
-                                            send(it->first, "+Ok. Uno de los jugadores salió. Partida cancelada, inicia partida de nuevo.\n", strlen("+Ok. Uno de los jugadores salió. Partida cancelada, inicia partida de nuevo.\n"), 0);
-                                            mapa_aux.erase(it->first);
+                                    if(mapa_aux[i] and partidas[mapa_aux[i]-1].get_gm() == MULTIPLAYER){
+                                        for(auto it = mapa_tmp.begin() ; it != mapa_tmp.end() ; ++it){
+                                            if(it->second == mapa_aux[i] && it->first != i){
+                                                send(it->first , "Partida acabada, alguien se desconectó.\n", strlen("Partida acabada, alguien se desconectó.\n"), 0);
+                                                usleep(300);
+                                                send(it->first , "Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n", strlen("Inicia otra partida con PARTIDA-INDIVIDUAL o PARTIDA-GRUPO\n"), 0);
+                                                mapa_aux.erase(it->first);
+                                            }
                                         }
                                     }
-                                    int pos = 0;
-                                    for(int i = 0 ; i < p_buffer.size() ; ++i){
-                                        if(p_buffer[i].get_socket() == i)
-                                            pos = i;
+                                    int pos;
+                                    for(int j = 0 ; j < p_buffer.size() ; ++j){
+                                        if(p_buffer[j].get_socket() == i)
+                                            pos = j;
                                     }
                                     p_buffer.erase(p_buffer.begin()+pos);
                                     mapa_aux.erase(i);

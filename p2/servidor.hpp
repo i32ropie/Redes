@@ -1,7 +1,7 @@
 #ifndef P2_SERVIDOR_HPP
 #define P2_SERVIDOR_HPP
 
-#define MAX_CLIENTES 30
+#define MAX_CLIENTES 50
 
 #include <map>
 #include <regex>

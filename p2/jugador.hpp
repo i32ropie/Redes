@@ -83,14 +83,6 @@ namespace r{
         inline uint get_score() const { return _score; }
         inline uint get_wins() const { return _wins; }
         inline uint get_loses() const {return _loses; }
-        Player &operator =(const Player &p) {
-            this->load_user(p.get_username());
-            return *this;
-        }
-//        void set_username(const std::string &username) {
-//            sql_stmt("update players set username = \"" + username + "\" where username = \"" +  _username + "\"");
-//            _username = username;
-//        }
         friend std::ostream &operator <<(std::ostream &output, const Player &p){
             output << "\tUsername: " << p.get_username() << std::endl;
             output << "\tPassword: " << p.get_password() << std::endl;
