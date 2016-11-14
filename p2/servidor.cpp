@@ -258,7 +258,8 @@ int main(){
                                             }
 //                                            send(i, state.c_str(), state.size(), 0);
                                             partidas[mapa_aux[i]-1].next_turn();
-                                            send(partidas[mapa_aux[i]-1].curr_player().get_socket(), "+Ok. Es su turno, puede comenzar\n", strlen("+Ok. Es su turno, puede comenzar\n"), 0);
+                                            if(partidas[mapa_aux[i]-1].get_gm() == MULTIPLAYER)
+                                                send(partidas[mapa_aux[i]-1].curr_player().get_socket(), "+Ok. Es su turno, puede comenzar\n", strlen("+Ok. Es su turno, puede comenzar\n"), 0);
                                         }
                                     }
                                     else{
@@ -287,7 +288,8 @@ int main(){
                                             }
 //                                            send(i, state.c_str(), state.size(), 0);
                                             partidas[mapa_aux[i]-1].next_turn();
-                                            send(partidas[mapa_aux[i]-1].curr_player().get_socket(), "+Ok. Es su turno, puede comenzar\n", strlen("+Ok. Es su turno, puede comenzar\n"), 0);
+                                            if(partidas[mapa_aux[i]-1].get_gm() == MULTIPLAYER)
+                                                send(partidas[mapa_aux[i]-1].curr_player().get_socket(), "+Ok. Es su turno, puede comenzar\n", strlen("+Ok. Es su turno, puede comenzar\n"), 0);
 
                                         }
                                     }

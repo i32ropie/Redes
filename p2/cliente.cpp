@@ -52,7 +52,7 @@ int main(){
                 std::cout << "Servidor cerrado." << std::endl;
                 exit(1);
             }
-            std::cout << tmp_buffer << std::endl;
+            std::cout<< tmp_buffer << std::endl;
         }
         else{
 //            std::cout << "> ";
